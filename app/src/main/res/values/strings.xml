@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Popular Movies</string>
+    <string name="movie_poster">Movie poster</string>
+    <string name="movie_title">Aquaman</string>
+    <string name="movie_overview">Arthur Curry learns that he is the heir to the underwater kingdom of Atlantis, and must step forward to lead his people and be a hero to the world.</string>
+    <string name="release_date">2018-12-07</string>
+    <string name="error_msg">Please try again!</string>
+    <string name="movie_rating">5.0</string>
+    <string name="overview_label">Overview:</string>
+    <string name="release_date_label">Released on:</string>
+    <string name="rating_label">Rating:</string>
+    <string name="image_description">Ideally the awesome movie image would load here!</string>
+    <string name="popular_menuItem">Most Popular</string>
+    <string name="topRated_menuItem">Highest Rated</string>
+</resources>
