@@ -15,19 +15,52 @@ import static com.android.popularmovies.utils.Constants.MOVIES_BASE_URL;
 
 public class NetworkUtils {
     public static URL populateURL(String sortBy) {
-        Uri uri = Uri.parse(MOVIES_BASE_URL).buildUpon()
+        Uri movieDataUri = Uri.parse(MOVIES_BASE_URL).buildUpon()
                 .appendEncodedPath(sortBy)
                 .appendQueryParameter(API_KEY_PARAM, API_KEY)
                 .build();
 
-        URL url = null;
+        URL movieDataUrl = null;
         try {
-            url = new URL(uri.toString());
+            movieDataUrl = new URL(movieDataUri.toString());
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
-        return url;
+        return movieDataUrl;
     }
+
+    public static URL populateUrlForTrailerData(int movieId) {
+        Uri trailerDataUri = Uri.parse(MOVIES_BASE_URL).buildUpon()
+                .appendEncodedPath(String.valueOf(movieId))
+                .appendEncodedPath("videos")
+                .appendQueryParameter(API_KEY_PARAM, API_KEY)
+                .build();
+
+        URL trailerDataUrl = null;
+        try {
+            trailerDataUrl = new URL(trailerDataUri.toString());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+        return trailerDataUrl;
+    }
+
+    public static URL populateUrlForReviewsData(int movieId) {
+        Uri reviewDataUri = Uri.parse(MOVIES_BASE_URL).buildUpon()
+                .appendEncodedPath(String.valueOf(movieId))
+                .appendEncodedPath("reviews")
+                .appendQueryParameter(API_KEY_PARAM, API_KEY)
+                .build();
+
+        URL reviewDataUrl = null;
+        try {
+            reviewDataUrl = new URL(reviewDataUri.toString());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+        return reviewDataUrl;
+    }
+
 
     // took this bit from the below file
     // https://github.com/udacity/ud851-Sunshine/blob/S04.01-Exercise-LaunchNewActivity/app/src/main/java/com/example/android/sunshine/utilities/NetworkUtils.java

@@ -10,6 +10,12 @@ class Constants {
 
     final static String TMDB_RESULTS = "results";
 
+    final static String TMDB_TRAILER_KEY = "key";
+    final static String TMDB_TRAILER_NAME = "name";
+
+    final static String TMDB_AUTHOR_KEY = "author";
+    final static String TMDB_CONTENT_KEY = "content";
+
     final static String TMDB_VOTE_COUNT = "vote_count";
     final static String TMDB_ID = "id";
     final static String TMDB_VIDEO = "video";

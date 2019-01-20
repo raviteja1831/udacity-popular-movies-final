@@ -11,6 +11,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 
+import com.android.popularmovies.adapter.MoviesAdapter;
+import com.android.popularmovies.dto.Movie;
 import com.android.popularmovies.utils.JsonUtils;
 import com.android.popularmovies.utils.NetworkUtils;
 
@@ -54,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
 
         Intent detailActivityIntent = new Intent(context, detailActivityClass);
         detailActivityIntent.putExtra(Intent.EXTRA_TEXT, adapterPosition);
+        detailActivityIntent.putExtra("movieId", jsonResponseFromTMDB.get(adapterPosition).getId());
         detailActivityIntent.putExtra("movieTitle", jsonResponseFromTMDB.get(adapterPosition).getTitle());
         detailActivityIntent.putExtra("imageUrl", jsonResponseFromTMDB.get(adapterPosition).getImageUrl());
         detailActivityIntent.putExtra("movieRating", jsonResponseFromTMDB.get(adapterPosition).getRating());
@@ -89,11 +92,6 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
 
         return super.onOptionsItemSelected(item);
     }
-
-    //    This AsyncTask class should be static or leaks might occur (com.android.popmovies.MainActivity.DownloadMoviesTask) less... (⌘F1)
-//    A static field will leak contexts.
-    // Not sure how to address this but hoping it won't break the app as taking the editor suggestion and changing to static then gets fired back while changing the RecyclerView to static and faced similar memory leak error.
-    // Guess I need to revisit some classes to refactor all of this, thought of moving out altogether to different object but wasn't sure of how to get access to recyclerView and adapter
 
     public class DownloadMoviesTask extends AsyncTask<String, Void, List<Movie>> {
 

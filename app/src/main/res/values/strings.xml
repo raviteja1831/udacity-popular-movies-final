@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Popular Movies</string>
+    <string name="app_name">Popular Movies Final R</string>
     <string name="movie_poster">Movie poster</string>
     <string name="movie_title">Aquaman</string>
     <string name="movie_overview">Arthur Curry learns that he is the heir to the underwater kingdom of Atlantis, and must step forward to lead his people and be a hero to the world.</string>
@@ -12,4 +12,6 @@
     <string name="image_description">Ideally the awesome movie image would load here!</string>
     <string name="popular_menuItem">Most Popular</string>
     <string name="topRated_menuItem">Highest Rated</string>
+    <string name="trailer_label">Trailers</string>
+    <string name="userReviews_label">User Reviews</string>
 </resources>

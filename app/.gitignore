@@ -1,5 +1,3 @@
-#used a template we usually keep at work
-
 .gradle
 /build/
 !gradle/wrapper/gradle-wrapper.jar
