@@ -14,4 +14,6 @@
     <string name="topRated_menuItem">Highest Rated</string>
     <string name="trailer_label">Trailers</string>
     <string name="userReviews_label">User Reviews</string>
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
 </resources>

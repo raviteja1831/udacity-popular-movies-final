@@ -26,6 +26,29 @@
             android:name=".DetailActivity"
             android:parentActivityName=".MainActivity">
         </activity>
+
+        <provider
+            android:name=".database.FavoriteMoviesProvider"
+            android:authorities="com.android.popularmovies"
+            android:exported="false" />
+
+        <activity
+            android:name=".FavoritesActivity"
+            android:parentActivityName=".MainActivity"
+            android:launchMode="singleTop">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".MainActivity" />
+        </activity>
+
+        <activity
+            android:name=".FavoriteMoviesActivity"
+            android:parentActivityName=".FavoritesActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".MainActivity" />
+        </activity>
+
     </application>
 
 </manifest>

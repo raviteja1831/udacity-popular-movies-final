@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -22,14 +23,22 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements MoviesAdapter.MoviesAdapterOnClickHandler {
 
-    String sortByQuery = "popular";
+    private static final String LIFECYCLE_CALLBACKS_KEY = "callbacks";
+    private static Bundle mRecyclerViewStateFromBundle;
+    private final String RECYCLER_VIEW_STATE = "recyclerView_state";
     private RecyclerView recyclerView;
+
+    String sortByQuery = "popular";
     private MoviesAdapter adapter;
-    private List<Movie> jsonResponseFromTMDB;
+    private List<Movie> movies;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if(savedInstanceState != null) {
+            sortByQuery = savedInstanceState.getString(LIFECYCLE_CALLBACKS_KEY);
+        }
+
         setContentView(R.layout.activity_main);
 
         recyclerView = findViewById(R.id.rv_movies);
@@ -56,12 +65,12 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
 
         Intent detailActivityIntent = new Intent(context, detailActivityClass);
         detailActivityIntent.putExtra(Intent.EXTRA_TEXT, adapterPosition);
-        detailActivityIntent.putExtra("movieId", jsonResponseFromTMDB.get(adapterPosition).getId());
-        detailActivityIntent.putExtra("movieTitle", jsonResponseFromTMDB.get(adapterPosition).getTitle());
-        detailActivityIntent.putExtra("imageUrl", jsonResponseFromTMDB.get(adapterPosition).getImageUrl());
-        detailActivityIntent.putExtra("movieRating", jsonResponseFromTMDB.get(adapterPosition).getRating());
-        detailActivityIntent.putExtra("movieOverview", jsonResponseFromTMDB.get(adapterPosition).getOverview());
-        detailActivityIntent.putExtra("releaseDate", jsonResponseFromTMDB.get(adapterPosition).getReleaseDate());
+        detailActivityIntent.putExtra("movieId", movies.get(adapterPosition).getId());
+        detailActivityIntent.putExtra("movieTitle", movies.get(adapterPosition).getTitle());
+        detailActivityIntent.putExtra("imageUrl", movies.get(adapterPosition).getImageUrl());
+        detailActivityIntent.putExtra("movieRating", movies.get(adapterPosition).getRating());
+        detailActivityIntent.putExtra("movieOverview", movies.get(adapterPosition).getOverview());
+        detailActivityIntent.putExtra("releaseDate", movies.get(adapterPosition).getReleaseDate());
 
         startActivity(detailActivityIntent);
 
@@ -89,8 +98,45 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
             return true;
         }
 
+        if (menuItem == R.id.action_FavoriteMovie) {
+            Context context = this;
+            Class destinationClass = FavoritesActivity.class;
+            Intent intent = new Intent(context, destinationClass);
+            startActivity(intent);
+            return true;
+        }
+
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        sortByQuery = savedInstanceState.getString(LIFECYCLE_CALLBACKS_KEY);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        String lifecycleSortBy = sortByQuery;
+        outState.putString(LIFECYCLE_CALLBACKS_KEY, lifecycleSortBy);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onPause() {
+        mRecyclerViewStateFromBundle = new Bundle();
+        Parcelable listState = recyclerView.getLayoutManager().onSaveInstanceState();
+        mRecyclerViewStateFromBundle.putParcelable(RECYCLER_VIEW_STATE, listState);
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mRecyclerViewStateFromBundle != null) {
+            Parcelable listState = mRecyclerViewStateFromBundle.getParcelable(RECYCLER_VIEW_STATE);
+            recyclerView.getLayoutManager().onRestoreInstanceState(listState);
+        }
     }
 
     public class DownloadMoviesTask extends AsyncTask<String, Void, List<Movie>> {
@@ -111,9 +157,9 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
             try {
                 String jsonResultsFromTMDB = NetworkUtils.getResponseFromHttpUrl(url);
 
-                jsonResponseFromTMDB = JsonUtils.populateMovies(MainActivity.this, jsonResultsFromTMDB);
+                movies = JsonUtils.populateMovies(MainActivity.this, jsonResultsFromTMDB);
 
-                return jsonResponseFromTMDB;
+                return movies;
 
             } catch (Exception e) {
                 e.printStackTrace();

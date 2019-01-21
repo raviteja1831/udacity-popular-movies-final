@@ -1,16 +1,27 @@
 package com.android.popularmovies;
 
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.popularmovies.adapter.ReviewsAdapter;
 import com.android.popularmovies.adapter.TrailersAdapter;
+import com.android.popularmovies.database.FavoriteMoviesContract;
+import com.android.popularmovies.database.FavoriteMoviesDBHelper;
 import com.android.popularmovies.dto.Review;
 import com.android.popularmovies.dto.Trailer;
 import com.android.popularmovies.utils.JsonUtils;
@@ -24,6 +35,9 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 
 public class DetailActivity extends AppCompatActivity {
+    private static Bundle mBundleRecyclerViewState;
+    private final String KEY_RECYCLER_STATE = "recyclerView_state";
+
     @BindView(R.id.iv_movie_poster)
     ImageView mMoviePoster;
     @BindView(R.id.tv_movie_title)
@@ -34,14 +48,28 @@ public class DetailActivity extends AppCompatActivity {
     TextView mMovieReleaseDate;
     @BindView(R.id.tv_rating)
     TextView mMovieRating;
+    @BindView(R.id.add_to_favorites)
+    Button mFavorites;
+    @BindView(R.id.details_scrollView)
+    ScrollView mScrollView;
+
+    String[] mProjection =
+            {
+                    FavoriteMoviesContract.Favorites._ID,
+                    FavoriteMoviesContract.Favorites.MOVIE_ID
+            };
+    Uri mNewUri;
 
     private String title;
-    private String moviePoster;
+    private String imageUrl;
     private String rating;
     private String overview;
     private String releaseDate;
     private int id;
 
+    private SQLiteDatabase mDb;
+    private String[] mSelectionArgs = {""};
+    private String mSelectionClause;
 
     private RecyclerView rv_trailers;
     private TrailersAdapter trailersAdapter;
@@ -55,6 +83,9 @@ public class DetailActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_detail);
+
+        FavoriteMoviesDBHelper dbHelper = new FavoriteMoviesDBHelper(this);
+        mDb = dbHelper.getWritableDatabase();
 
         ButterKnife.bind(this);
 
@@ -76,6 +107,33 @@ public class DetailActivity extends AppCompatActivity {
         rv_reviews.setAdapter(reviewsAdapter);
         populateUserReviews();
 
+        id = getIntent().getIntExtra("movieId", 0);
+
+        mFavorites.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                //if (isMovieFavorited(id)) {
+                if (isMovieFavorited(String.valueOf(id))) {
+                    removeFavorites(String.valueOf(id));
+
+                    Context context = getApplicationContext();
+                    CharSequence removedFavorites = "This movie is removed from your favorites.";
+                    Toast toast = Toast.makeText(context, removedFavorites, Toast.LENGTH_SHORT);
+                    toast.show();
+
+                    mFavorites.setText(getString(R.string.add_to_favorites));
+                } else {
+                    addToFavorites(title, id, imageUrl, rating, releaseDate, overview);
+                    Context context = getApplicationContext();
+                    CharSequence addedFavorites = "This movie is added to your favorites.";
+                    Toast toast = Toast.makeText(context, addedFavorites, Toast.LENGTH_SHORT);
+                    toast.show();
+
+                    mFavorites.setText(getString(R.string.remove_from_favorites));
+                }
+            }
+        });
+
+        isMovieFavorited(String.valueOf(id));
     }
 
     private void populateUserReviews() {
@@ -88,7 +146,7 @@ public class DetailActivity extends AppCompatActivity {
 
     private void populateMovieDetails() {
         title = getIntent().getStringExtra("movieTitle");
-        moviePoster = getIntent().getStringExtra("imageUrl");
+        imageUrl = getIntent().getStringExtra("imageUrl");
         rating = getIntent().getStringExtra("movieRating");
         overview = getIntent().getStringExtra("movieOverview");
         releaseDate = getIntent().getStringExtra("releaseDate");
@@ -100,8 +158,79 @@ public class DetailActivity extends AppCompatActivity {
         mMovieRating.setText(rating);
 
         Picasso.get()
-                .load(moviePoster)
+                .load(imageUrl)
                 .into(mMoviePoster);
+    }
+
+    private void addToFavorites(String name, int id, String poster, String rate, String release, String overview) {
+        //create a ContentValues instance to pass the values onto the insert query
+        ContentValues cv = new ContentValues();
+        //call put to insert the values with the keys
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
+        cv.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
+        //run an insert query on TABLE_NAME with the ContentValues created
+        //return mDb.insert(FavoritesContract.FavoritesAdd.TABLE_NAME, null, cv);
+        mNewUri = getContentResolver().insert(
+                FavoriteMoviesContract.Favorites.CONTENT_URI,
+                cv
+        );
+    }
+
+    //remove favorites
+    private void removeFavorites(String id) {
+        mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " LIKE ?";
+        String[] selectionArgs = new String[]{id};
+        //return mDb.delete(FavoritesContract.FavoritesAdd.TABLE_NAME,
+        //      FavoritesContract.FavoritesAdd.COLUMN_MOVIE_ID + "=" + id, null) > 0;
+        getContentResolver().delete(
+                FavoriteMoviesContract.Favorites.CONTENT_URI,
+                mSelectionClause,
+                selectionArgs
+        );
+    }
+
+    //https://stackoverflow.com/questions/28236390/recyclerview-store-restore-state-between-activities
+    @Override
+    protected void onPause() {
+        mBundleRecyclerViewState = new Bundle();
+        Parcelable listState = rv_reviews.getLayoutManager().onSaveInstanceState();
+        mBundleRecyclerViewState.putParcelable(KEY_RECYCLER_STATE, listState);
+
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mBundleRecyclerViewState != null) {
+            Parcelable listState = mBundleRecyclerViewState.getParcelable(KEY_RECYCLER_STATE);
+            rv_reviews.getLayoutManager().onRestoreInstanceState(listState);
+        }
+    }
+
+    //check if the id exist in database
+    public boolean isMovieFavorited(String id) {
+        mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " = ?";
+        mSelectionArgs[0] = id;
+        Cursor mCursor = getContentResolver().query(
+                FavoriteMoviesContract.Favorites.CONTENT_URI,
+                mProjection,
+                mSelectionClause,
+                mSelectionArgs,
+                null);
+
+        if (mCursor.getCount() <= 0) {
+            mCursor.close();
+            mFavorites.setText(getString(R.string.add_to_favorites));
+            return false;
+        }
+        mCursor.close();
+        mFavorites.setText(getString(R.string.remove_from_favorites));
+        return true;
     }
 
     public class DownloadUserReviewsTask extends AsyncTask<String, Void, List<Review>> {
@@ -182,7 +311,7 @@ public class DetailActivity extends AppCompatActivity {
                 rv_trailers.setAdapter(trailersAdapter);
             }
 
-            // error handling can be added to else condition, going to skip for now.
+            // error handling to be added for else condition, going to skip for now.
         }
     }
 }

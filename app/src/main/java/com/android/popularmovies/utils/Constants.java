@@ -1,6 +1,6 @@
 package com.android.popularmovies.utils;
 
-class Constants {
+public class Constants {
     final static String API_KEY = "";
     final static String API_KEY_PARAM = "api_key";
 
@@ -38,5 +38,8 @@ class Constants {
     final static String TMDB_IMAGE_W342 = "w342";
     final static String TMDB_IMAGE_W500 = "w500";
     final static String TMDB_IMAGE_W780 = "w780";
+
+
+    public final static String AUTHORITY = "com.android.popularmovies";
 
 }
