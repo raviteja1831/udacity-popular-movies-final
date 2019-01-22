@@ -17,6 +17,7 @@ import java.util.List;
 
 public class TrailersAdapter extends RecyclerView.Adapter<TrailersAdapter.TrailersAdapterViewHolder> {
 
+    private static final String YOUTUBE_BASE_URL = "https://www.youtube.com/watch?v=";
     private List<Trailer> mTrailers;
     private TextView tv_movie_trailers;
     private Context context;
@@ -43,12 +44,16 @@ public class TrailersAdapter extends RecyclerView.Adapter<TrailersAdapter.Traile
     public void onBindViewHolder(@NonNull TrailersAdapterViewHolder holder, int position) {
         tv_movie_trailers.setText(mTrailers.get(position).getName());
 
+        // https://stackoverflow.com/questions/7324759/how-to-display-thumbnail-of-youtube-videos-in-android/38740186#38740186
+        // found some help online on how to display thumbnail images but not sure how to make onClick of images to open youtube app.
+        // any kind of guidance is appreciated, will be working on smaller project once Im done with submissions.
+
         final String trailerToPlayOnVideoApp = mTrailers.get(position).getKey();
         holder.itemView.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
-                Uri openTrailerVideo = Uri.parse("https://www.youtube.com/watch?v=" + trailerToPlayOnVideoApp);
+                Uri openTrailerVideo = Uri.parse(YOUTUBE_BASE_URL + trailerToPlayOnVideoApp);
 
                 Intent intent = new Intent(Intent.ACTION_VIEW, openTrailerVideo);
                 context.startActivity(intent);
@@ -64,8 +69,8 @@ public class TrailersAdapter extends RecyclerView.Adapter<TrailersAdapter.Traile
         return mTrailers.size();
     }
 
-    public class TrailersAdapterViewHolder extends RecyclerView.ViewHolder {
-        public TrailersAdapterViewHolder(@NonNull View itemView) {
+    class TrailersAdapterViewHolder extends RecyclerView.ViewHolder {
+        TrailersAdapterViewHolder(@NonNull View itemView) {
             super(itemView);
             tv_movie_trailers = itemView.findViewById(R.id.tv_movie_trailers);
         }

@@ -1,288 +1,197 @@
 package com.android.popularmovies;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.popularmovies.adapter.ReviewsAdapter;
 import com.android.popularmovies.adapter.TrailersAdapter;
 import com.android.popularmovies.database.FavoriteMoviesContract;
-import com.android.popularmovies.database.FavoriteMoviesDBHelper;
 import com.android.popularmovies.dto.Review;
 import com.android.popularmovies.dto.Trailer;
+import com.android.popularmovies.utils.AppExecutors;
 import com.android.popularmovies.utils.JsonUtils;
 import com.android.popularmovies.utils.NetworkUtils;
+import com.sackcentury.shinebuttonlib.ShineButton;
 import com.squareup.picasso.Picasso;
 
 import java.net.URL;
 import java.util.List;
+import java.util.Objects;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
-public class FavoriteMoviesActivity extends DetailActivity {
+import static com.android.popularmovies.utils.Constants.IMAGE_URL;
+import static com.android.popularmovies.utils.Constants.MOVIE_ID;
+import static com.android.popularmovies.utils.Constants.MOVIE_OVERVIEW;
+import static com.android.popularmovies.utils.Constants.MOVIE_RATING;
+import static com.android.popularmovies.utils.Constants.MOVIE_TITLE;
+import static com.android.popularmovies.utils.Constants.RELEASE_DATE;
 
-    private RecyclerView mRecyclerView;
-    private RecyclerView mRecyclerViewReviews;
+public class FavoriteMoviesActivity extends AppCompatActivity {
+
     private static Bundle mBundleRecyclerViewState;
     private final String KEY_RECYCLER_STATE = "recyclerView_state";
-    private TrailersAdapter mTrailerAdapter;
-    private ReviewsAdapter mReviewAdapter;
-    private List<Trailer> jsonTrailerData;
-    private List<Review> jsonReviewData;
-    private int id = 0;
-    private String title = "";
-    private String poster = "";
-    private String rate = "";
-    private String release = "";
-    private String overview = "";
-    private SQLiteDatabase mDb;
-    String[] mProjection =
+    String[] columnsToReturnProjection =
             {
                     FavoriteMoviesContract.Favorites._ID,
                     FavoriteMoviesContract.Favorites.MOVIE_ID
             };
-
-    private String[] mSelectionArgs = {""};
-    private String mSelectionClause;
-    Uri mNewUri;
-
+    Uri newContentUri;
 
     @BindView(R.id.iv_movie_poster)
-    ImageView mMoviePosterDisplay;
+    ImageView mMoviePoster;
     @BindView(R.id.tv_movie_title)
-    TextView mMovieTitleDisplay;
-    @BindView(R.id.tv_rating)
-    TextView mMovieRateDisplay;
-    @BindView(R.id.tv_release_date)
-    TextView mMovieReleaseDisplay;
+    TextView mMovieTitle;
     @BindView(R.id.tv_movie_overview)
-    TextView mMoviePlotSynopsisDisplay;
-    @BindView(R.id.add_to_favorites)
-    Button mFavorites;
+    TextView mMovieOverview;
+    @BindView(R.id.tv_release_date)
+    TextView mMovieReleaseDate;
+    @BindView(R.id.tv_rating)
+    TextView mMovieRating;
+    @BindView(R.id.btn_favourite)
+    ShineButton favoriteButton;
     @BindView(R.id.details_scrollView)
     ScrollView mScrollView;
 
+    private RecyclerView rv_reviews;
+    private RecyclerView rv_trailers;
+    private TrailersAdapter trailersAdapter;
+    private ReviewsAdapter reviewsAdapter;
+
+    private String title;
+    private String imageUrl;
+    private String rating;
+    private String overview;
+    private String releaseDate;
+    private int id;
+
+    private String[] mSelectionArgs = {""};
+    private String mSelectionClause;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.favorite_activity_detail);
-
-        //favorites
-        FavoriteMoviesDBHelper dbHelper = new FavoriteMoviesDBHelper(this);
-        mDb = dbHelper.getWritableDatabase();
-
-
-
-        //trailers
-        mRecyclerView = (RecyclerView) findViewById(R.id.rv_trailers);
-
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        //set the layout manager
-        mRecyclerView.setLayoutManager(layoutManager);
-        //changes in content shouldn't change the layout size
-        mRecyclerView.setHasFixedSize(true);
-
-        //set trailer adapter for recycler view
-        mRecyclerView.setAdapter(mTrailerAdapter);
-
-
-
-        //reviews
-        mRecyclerViewReviews = (RecyclerView) findViewById(R.id.rv_movie_reviews);
-
-        LinearLayoutManager reviewsLayoutManager = new LinearLayoutManager(this);
-        //set the layout manager
-        mRecyclerViewReviews.setLayoutManager(reviewsLayoutManager);
-        //changes in content shouldn't change the layout size
-        mRecyclerViewReviews.setHasFixedSize(true);
-
-        //set review adapter for recycler view
-        mRecyclerViewReviews.setAdapter(mReviewAdapter);
-
+        setTitle("Favorite Movie Details");
 
         ButterKnife.bind(this);
 
+        populateMovieDetails();
 
-        // https://stackoverflow.com/questions/41791737/how-to-pass-json-image-from-recycler-view-to-another-activity
-        poster = getIntent().getStringExtra("imageUrl");
-        title = getIntent().getStringExtra("movieTitle");
-        rate = getIntent().getStringExtra("movieRating");
-        release = getIntent().getStringExtra("releaseDate");
-        overview = getIntent().getStringExtra("movieOverview");
-        id = getIntent().getIntExtra("movieId",0);
+        trailers();
 
+        userReviews();
 
-        mMovieTitleDisplay.setText(title);
-        mMoviePlotSynopsisDisplay.setText(overview);
-        mMovieRateDisplay.setText(rate);
-        mMovieReleaseDisplay.setText(release);
-        Picasso.get()
-                .load(poster)
-                .into(mMoviePosterDisplay);
+        if (isFavoriteMovie(String.valueOf(id))) {
+            favoriteButton.setChecked(true);
+        }
+        favoriteButtonOnStateChanged();
 
-        mFavorites.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (isMovieFavorited(String.valueOf(id))) {
-                    removeFavorites(String.valueOf(id));
+        isFavoriteMovie(String.valueOf(id));
+    }
 
-                    Context context = getApplicationContext();
-                    CharSequence removedFavorites = "This movie is removed from your favorites.";
-                    Toast toast = Toast.makeText(context, removedFavorites, Toast.LENGTH_SHORT);
-                    toast.show();
+    private void favoriteButtonOnStateChanged() {
+        favoriteButton.setOnCheckStateChangeListener(new ShineButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(View view, final boolean checked) {
+                AppExecutors.getInstance().diskIO().execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (checked) {
+                                addToFavorites(title, id, imageUrl, rating, releaseDate, overview);
+                            } else {
+                                removeFromFavorites(String.valueOf(id));
+                            }
 
-                    mFavorites.setText(getString(R.string.add_to_favorites));
-                } else {
-                    addToFavorites(title, id, poster, rate, release, overview);
-                    Context context = getApplicationContext();
-                    CharSequence addedFavorites = "This movie is added to your favorites.";
-                    Toast toast = Toast.makeText(context, addedFavorites, Toast.LENGTH_SHORT);
-                    toast.show();
-
-                    mFavorites.setText(getString(R.string.remove_from_favorites));
-                }
+                        } catch (Exception e) {
+                            Log.e(FavoriteMoviesActivity.class.getSimpleName(), e.getMessage());
+                        }
+                    }
+                });
             }
         });
+    }
 
+    private void userReviews() {
+        rv_reviews = findViewById(R.id.rv_movie_reviews);
+        LinearLayoutManager reviewsLayoutManager = new LinearLayoutManager(this);
 
-        loadTrailerData();
-        loadReviewData();
-        isMovieFavorited(String.valueOf(id));
+        rv_reviews.setLayoutManager(reviewsLayoutManager);
+        rv_reviews.setHasFixedSize(true);
+        rv_reviews.setAdapter(reviewsAdapter);
+        populateUserReviews();
+    }
+
+    private void trailers() {
+        rv_trailers = findViewById(R.id.rv_trailers);
+        LinearLayoutManager trailersLayoutManager = new LinearLayoutManager(this);
+
+        rv_trailers.setLayoutManager(trailersLayoutManager);
+        rv_trailers.setHasFixedSize(true);
+        rv_trailers.setAdapter(trailersAdapter);
+        populateTrailers();
     }
 
 
-    private void loadTrailerData() {
-        String trailerId = String.valueOf(id);
-        new FetchTrailerTask().execute(trailerId);
+    private void populateMovieDetails() {
+        title = getIntent().getStringExtra(MOVIE_TITLE);
+        imageUrl = getIntent().getStringExtra(IMAGE_URL);
+        rating = getIntent().getStringExtra(MOVIE_RATING);
+        overview = getIntent().getStringExtra(MOVIE_OVERVIEW);
+        releaseDate = getIntent().getStringExtra(RELEASE_DATE);
+        id = getIntent().getIntExtra(MOVIE_ID, 0);
+
+        mMovieTitle.setText(title);
+        mMovieOverview.setText(overview);
+        mMovieReleaseDate.setText(releaseDate);
+        mMovieRating.setText(rating);
+
+        Picasso.get()
+                .load(imageUrl)
+                .into(mMoviePoster);
     }
 
-    private void loadReviewData() {
-        String reviewId = String.valueOf(id);
-        new FetchReviewTask().execute(reviewId);
+    private void populateUserReviews() {
+        new DownloadUserReviewsTask().execute(String.valueOf(id));
     }
 
-    // Async Task for trailers
-    public class FetchTrailerTask extends AsyncTask<String, Void, List<Trailer>> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected List<Trailer> doInBackground(String... params) {
-            if (params.length == 0){
-                return null;
-            }
-
-            URL movieRequestUrl = NetworkUtils.populateUrlForTrailerData(id);
-
-            try {
-                String jsonMovieResponse = NetworkUtils.getResponseFromHttpUrl(movieRequestUrl);
-
-                jsonTrailerData
-                        = JsonUtils.populateTrailers(FavoriteMoviesActivity.this, jsonMovieResponse);
-
-                return jsonTrailerData;
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            }
-        }
-
-        @Override
-        protected void onPostExecute(List<Trailer> trailerData) {
-            if (trailerData != null) {
-                mTrailerAdapter = new TrailersAdapter(trailerData, FavoriteMoviesActivity.this);
-                mRecyclerView.setAdapter(mTrailerAdapter);
-            } else {
-            }
-
-        }
-
+    private void populateTrailers() {
+        new DownloadTrailersTask().execute(String.valueOf(id));
     }
 
+    private void addToFavorites(String name, int id, String poster, String rate, String release, String overview) {
+        ContentValues contentValues = new ContentValues();
 
-    //Async task for reviews
-    public class FetchReviewTask extends AsyncTask<String, Void, List<Review>> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
 
-        @Override
-        protected List<Review> doInBackground(String... params) {
-            if (params.length == 0){
-                return null;
-            }
-
-            URL movieRequestUrl = NetworkUtils.populateUrlForReviewsData(id);
-
-            try {
-                String jsonMovieResponse = NetworkUtils.getResponseFromHttpUrl(movieRequestUrl);
-
-                jsonReviewData
-                        = JsonUtils.populateUserReviews(FavoriteMoviesActivity.this, jsonMovieResponse);
-
-                return jsonReviewData;
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            }
-        }
-
-        @Override
-        protected void onPostExecute(List<Review> reviewData) {
-            if (reviewData != null) {
-                mReviewAdapter = new ReviewsAdapter(reviewData);
-                mRecyclerViewReviews.setAdapter(mReviewAdapter);
-            } else {
-            }
-        }
-
-    }
-
-
-    //add to favorites
-    private void addToFavorites(String name, int id, String poster, String rate, String release, String overview){
-        //create a ContentValues instance to pass the values onto the insert query
-        ContentValues cv = new ContentValues();
-        //call put to insert the values with the keys
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
-        //run an insert query on TABLE_NAME with the ContentValues created
-        //return mDb.insert(FavoriteMoviesContract.Favorites.TABLE_NAME, null, cv);
-        mNewUri = getContentResolver().insert(
+        newContentUri = getContentResolver().insert(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
-                cv
+                contentValues
         );
     }
 
-    //remove favorites
-    private void removeFavorites(String id){
+    private void removeFromFavorites(String id) {
         mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " LIKE ?";
-        String[] selectionArgs = new String[] {id};
-        //return mDb.delete(FavoritesContract.FavoritesAdd.TABLE_NAME,
-        //      FavoritesContract.FavoritesAdd.COLUMN_MOVIE_ID + "=" + id, null) > 0;
+        String[] selectionArgs = new String[]{id};
         getContentResolver().delete(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
                 mSelectionClause,
@@ -290,33 +199,29 @@ public class FavoriteMoviesActivity extends DetailActivity {
         );
     }
 
-    //check if the id exist in database
-    public boolean isMovieFavorited(String id){
+    public boolean isFavoriteMovie(String id) {
         mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " = ?";
         mSelectionArgs[0] = id;
         Cursor mCursor = getContentResolver().query(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
-                mProjection,
+                columnsToReturnProjection,
                 mSelectionClause,
                 mSelectionArgs,
                 null);
 
-        if(mCursor.getCount() <= 0){
+        if (Objects.requireNonNull(mCursor).getCount() <= 0) {
             mCursor.close();
-            mFavorites.setText(getString(R.string.add_to_favorites));
             return false;
         }
         mCursor.close();
-        mFavorites.setText(getString(R.string.remove_from_favorites));
         return true;
     }
 
-
-    //https://stackoverflow.com/questions/28236390/recyclerview-store-restore-state-between-activities
     @Override
     protected void onPause() {
         mBundleRecyclerViewState = new Bundle();
-        Parcelable listState = mRecyclerViewReviews.getLayoutManager().onSaveInstanceState();
+
+        Parcelable listState = Objects.requireNonNull(rv_reviews.getLayoutManager()).onSaveInstanceState();
         mBundleRecyclerViewState.putParcelable(KEY_RECYCLER_STATE, listState);
 
         super.onPause();
@@ -325,9 +230,82 @@ public class FavoriteMoviesActivity extends DetailActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
         if (mBundleRecyclerViewState != null) {
             Parcelable listState = mBundleRecyclerViewState.getParcelable(KEY_RECYCLER_STATE);
-            mRecyclerViewReviews.getLayoutManager().onRestoreInstanceState(listState);
+            Objects.requireNonNull(rv_trailers.getLayoutManager()).onRestoreInstanceState(listState);
+        }
+    }
+
+    public class DownloadUserReviewsTask extends AsyncTask<String, Void, List<Review>> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected List<Review> doInBackground(String... params) {
+            if (params.length == 0) {
+                return null;
+            }
+
+            URL reviewsUrl = NetworkUtils.populateUrlForReviewsData(id);
+
+            try {
+                String reviewsJsonFromTMDB = NetworkUtils.getResponseFromHttpUrl(reviewsUrl);
+
+                return JsonUtils.populateUserReviews(FavoriteMoviesActivity.this, reviewsJsonFromTMDB);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(List<Review> reviewsList) {
+            if (!reviewsList.isEmpty()) {
+                TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
+                tv_userReviews_label.setVisibility(View.VISIBLE);
+                rv_reviews.setVisibility(View.VISIBLE);
+                reviewsAdapter = new ReviewsAdapter(reviewsList);
+                rv_reviews.setAdapter(reviewsAdapter);
+            }
+        }
+
+    }
+
+    public class DownloadTrailersTask extends AsyncTask<String, Void, List<Trailer>> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected List<Trailer> doInBackground(String... params) {
+            if (params.length == 0) {
+                return null;
+            }
+
+            URL trailersUrl = NetworkUtils.populateUrlForTrailerData(id);
+
+            try {
+                String trailersJsonFromTMDB = NetworkUtils.getResponseFromHttpUrl(trailersUrl);
+
+                return JsonUtils.populateTrailers(FavoriteMoviesActivity.this, trailersJsonFromTMDB);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(List<Trailer> trailerList) {
+            if (trailerList != null) {
+                trailersAdapter = new TrailersAdapter(trailerList, FavoriteMoviesActivity.this);
+                rv_trailers.setAdapter(trailersAdapter);
+            }
         }
     }
 

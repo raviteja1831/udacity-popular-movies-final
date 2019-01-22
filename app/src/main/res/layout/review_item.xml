@@ -21,4 +21,9 @@
         android:textStyle="italic"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="1dp"
+        android:background="#c6e4fc" />
+
 </LinearLayout>

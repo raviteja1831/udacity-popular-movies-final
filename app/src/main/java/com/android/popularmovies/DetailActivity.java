@@ -1,9 +1,7 @@
 package com.android.popularmovies;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -11,28 +9,36 @@ import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.popularmovies.adapter.ReviewsAdapter;
 import com.android.popularmovies.adapter.TrailersAdapter;
 import com.android.popularmovies.database.FavoriteMoviesContract;
-import com.android.popularmovies.database.FavoriteMoviesDBHelper;
 import com.android.popularmovies.dto.Review;
 import com.android.popularmovies.dto.Trailer;
+import com.android.popularmovies.utils.AppExecutors;
 import com.android.popularmovies.utils.JsonUtils;
 import com.android.popularmovies.utils.NetworkUtils;
+import com.sackcentury.shinebuttonlib.ShineButton;
 import com.squareup.picasso.Picasso;
 
 import java.net.URL;
 import java.util.List;
+import java.util.Objects;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+
+import static com.android.popularmovies.utils.Constants.IMAGE_URL;
+import static com.android.popularmovies.utils.Constants.MOVIE_ID;
+import static com.android.popularmovies.utils.Constants.MOVIE_OVERVIEW;
+import static com.android.popularmovies.utils.Constants.MOVIE_RATING;
+import static com.android.popularmovies.utils.Constants.MOVIE_TITLE;
+import static com.android.popularmovies.utils.Constants.RELEASE_DATE;
 
 public class DetailActivity extends AppCompatActivity {
     private static Bundle mBundleRecyclerViewState;
@@ -48,49 +54,54 @@ public class DetailActivity extends AppCompatActivity {
     TextView mMovieReleaseDate;
     @BindView(R.id.tv_rating)
     TextView mMovieRating;
-    @BindView(R.id.add_to_favorites)
-    Button mFavorites;
+    @BindView(R.id.btn_favourite)
+    ShineButton favoriteButton;
     @BindView(R.id.details_scrollView)
     ScrollView mScrollView;
 
-    String[] mProjection =
+    String[] columnsToReturnProjection =
             {
                     FavoriteMoviesContract.Favorites._ID,
                     FavoriteMoviesContract.Favorites.MOVIE_ID
             };
-    Uri mNewUri;
+    Uri newContentUri;
 
-    private String title;
+    private String movieTitle;
     private String imageUrl;
-    private String rating;
-    private String overview;
+    private String movieRating;
+    private String movieOverview;
     private String releaseDate;
-    private int id;
+    private int movieId;
 
-    private SQLiteDatabase mDb;
-    private String[] mSelectionArgs = {""};
-    private String mSelectionClause;
+    private String[] selectionArgs = {""};
+    private String selectionClause;
 
     private RecyclerView rv_trailers;
     private TrailersAdapter trailersAdapter;
-    private List<Trailer> trailers;
 
     private RecyclerView rv_reviews;
     private ReviewsAdapter reviewsAdapter;
-    private List<Review> reviews;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_detail);
-
-        FavoriteMoviesDBHelper dbHelper = new FavoriteMoviesDBHelper(this);
-        mDb = dbHelper.getWritableDatabase();
+        setTitle("Movie details");
 
         ButterKnife.bind(this);
 
         populateMovieDetails();
+        trailers();
+        userReviews();
 
+        if (isFavoriteMovie(String.valueOf(movieId))) {
+            favoriteButton.setChecked(true);
+        }
+        favoriteButtonOnStateChanged();
+        isFavoriteMovie(String.valueOf(movieId));
+    }
+
+    private void trailers() {
         rv_trailers = findViewById(R.id.rv_trailers);
         LinearLayoutManager trailersLayoutManager = new LinearLayoutManager(this);
 
@@ -98,64 +109,62 @@ public class DetailActivity extends AppCompatActivity {
         rv_trailers.setHasFixedSize(true);
         rv_trailers.setAdapter(trailersAdapter);
         populateTrailers();
+    }
 
+    private void userReviews() {
         rv_reviews = findViewById(R.id.rv_movie_reviews);
         LinearLayoutManager reviewsLayoutManager = new LinearLayoutManager(this);
 
         rv_reviews.setLayoutManager(reviewsLayoutManager);
         rv_reviews.setHasFixedSize(true);
         rv_reviews.setAdapter(reviewsAdapter);
+        rv_reviews.setVisibility(View.INVISIBLE);
         populateUserReviews();
+    }
 
-        id = getIntent().getIntExtra("movieId", 0);
+    private void favoriteButtonOnStateChanged() {
+        favoriteButton.setOnCheckStateChangeListener(new ShineButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(View view, final boolean checked) {
+                AppExecutors.getInstance().diskIO().execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (checked) {
+                                addToFavorites(movieTitle, movieId, imageUrl, movieRating, releaseDate, movieOverview);
+                            } else {
+                                removeFromFavorites(String.valueOf(movieId));
+                            }
 
-        mFavorites.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                //if (isMovieFavorited(id)) {
-                if (isMovieFavorited(String.valueOf(id))) {
-                    removeFavorites(String.valueOf(id));
-
-                    Context context = getApplicationContext();
-                    CharSequence removedFavorites = "This movie is removed from your favorites.";
-                    Toast toast = Toast.makeText(context, removedFavorites, Toast.LENGTH_SHORT);
-                    toast.show();
-
-                    mFavorites.setText(getString(R.string.add_to_favorites));
-                } else {
-                    addToFavorites(title, id, imageUrl, rating, releaseDate, overview);
-                    Context context = getApplicationContext();
-                    CharSequence addedFavorites = "This movie is added to your favorites.";
-                    Toast toast = Toast.makeText(context, addedFavorites, Toast.LENGTH_SHORT);
-                    toast.show();
-
-                    mFavorites.setText(getString(R.string.remove_from_favorites));
-                }
+                        } catch (Exception e) {
+                            Log.e(DetailActivity.class.getSimpleName(), e.getMessage());
+                        }
+                    }
+                });
             }
         });
-
-        isMovieFavorited(String.valueOf(id));
     }
 
     private void populateUserReviews() {
-        new DownloadUserReviewsTask().execute(String.valueOf(id));
+        new DownloadUserReviewsTask().execute(String.valueOf(movieId));
     }
 
     private void populateTrailers() {
-        new DownloadTrailersTask().execute(String.valueOf(id));
+        new DownloadTrailersTask().execute(String.valueOf(movieId));
     }
 
     private void populateMovieDetails() {
-        title = getIntent().getStringExtra("movieTitle");
-        imageUrl = getIntent().getStringExtra("imageUrl");
-        rating = getIntent().getStringExtra("movieRating");
-        overview = getIntent().getStringExtra("movieOverview");
-        releaseDate = getIntent().getStringExtra("releaseDate");
-        id = getIntent().getIntExtra("movieId", 0);
+        movieTitle = getIntent().getStringExtra(MOVIE_TITLE);
+        imageUrl = getIntent().getStringExtra(IMAGE_URL);
+        movieRating = getIntent().getStringExtra(MOVIE_RATING);
+        movieOverview = getIntent().getStringExtra(MOVIE_OVERVIEW);
+        releaseDate = getIntent().getStringExtra(RELEASE_DATE);
+        movieId = getIntent().getIntExtra(MOVIE_ID, 0);
 
-        mMovieTitle.setText(title);
-        mMovieOverview.setText(overview);
+        mMovieTitle.setText(movieTitle);
+        mMovieOverview.setText(movieOverview);
         mMovieReleaseDate.setText(releaseDate);
-        mMovieRating.setText(rating);
+        mMovieRating.setText(movieRating);
 
         Picasso.get()
                 .load(imageUrl)
@@ -163,41 +172,38 @@ public class DetailActivity extends AppCompatActivity {
     }
 
     private void addToFavorites(String name, int id, String poster, String rate, String release, String overview) {
-        //create a ContentValues instance to pass the values onto the insert query
-        ContentValues cv = new ContentValues();
-        //call put to insert the values with the keys
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
-        cv.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
-        //run an insert query on TABLE_NAME with the ContentValues created
-        //return mDb.insert(FavoritesContract.FavoritesAdd.TABLE_NAME, null, cv);
-        mNewUri = getContentResolver().insert(
+        ContentValues contentValues = new ContentValues();
+
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
+        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
+
+
+        newContentUri = getContentResolver().insert(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
-                cv
+                contentValues
         );
     }
 
-    //remove favorites
-    private void removeFavorites(String id) {
-        mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " LIKE ?";
+    private void removeFromFavorites(String id) {
+        selectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " LIKE ?";
         String[] selectionArgs = new String[]{id};
-        //return mDb.delete(FavoritesContract.FavoritesAdd.TABLE_NAME,
-        //      FavoritesContract.FavoritesAdd.COLUMN_MOVIE_ID + "=" + id, null) > 0;
+
         getContentResolver().delete(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
-                mSelectionClause,
+                selectionClause,
                 selectionArgs
         );
     }
 
-    //https://stackoverflow.com/questions/28236390/recyclerview-store-restore-state-between-activities
     @Override
     protected void onPause() {
         mBundleRecyclerViewState = new Bundle();
-        Parcelable listState = rv_reviews.getLayoutManager().onSaveInstanceState();
+
+        Parcelable listState = Objects.requireNonNull(rv_reviews.getLayoutManager()).onSaveInstanceState();
         mBundleRecyclerViewState.putParcelable(KEY_RECYCLER_STATE, listState);
 
         super.onPause();
@@ -206,30 +212,28 @@ public class DetailActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
         if (mBundleRecyclerViewState != null) {
             Parcelable listState = mBundleRecyclerViewState.getParcelable(KEY_RECYCLER_STATE);
-            rv_reviews.getLayoutManager().onRestoreInstanceState(listState);
+            Objects.requireNonNull(rv_reviews.getLayoutManager()).onRestoreInstanceState(listState);
         }
     }
 
-    //check if the id exist in database
-    public boolean isMovieFavorited(String id) {
-        mSelectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " = ?";
-        mSelectionArgs[0] = id;
+    public boolean isFavoriteMovie(String id) {
+        selectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " = ?";
+        selectionArgs[0] = id;
         Cursor mCursor = getContentResolver().query(
                 FavoriteMoviesContract.Favorites.CONTENT_URI,
-                mProjection,
-                mSelectionClause,
-                mSelectionArgs,
+                columnsToReturnProjection,
+                selectionClause,
+                selectionArgs,
                 null);
 
-        if (mCursor.getCount() <= 0) {
+        if (Objects.requireNonNull(mCursor).getCount() <= 0) {
             mCursor.close();
-            mFavorites.setText(getString(R.string.add_to_favorites));
             return false;
         }
         mCursor.close();
-        mFavorites.setText(getString(R.string.remove_from_favorites));
         return true;
     }
 
@@ -245,13 +249,12 @@ public class DetailActivity extends AppCompatActivity {
                 return null;
             }
 
-            URL reviewsUrl = NetworkUtils.populateUrlForReviewsData(id);
+            URL reviewsUrl = NetworkUtils.populateUrlForReviewsData(movieId);
 
             try {
                 String reviewsJsonFromTMDB = NetworkUtils.getResponseFromHttpUrl(reviewsUrl);
 
-                reviews = JsonUtils.populateUserReviews(DetailActivity.this, reviewsJsonFromTMDB);
-                return reviews;
+                return JsonUtils.populateUserReviews(DetailActivity.this, reviewsJsonFromTMDB);
 
 
             } catch (Exception e) {
@@ -262,10 +265,24 @@ public class DetailActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(List<Review> reviewsList) {
+            // having hard time how to not have the label when there is no reviews available, moved around this piece of code to multiple places, need some help on how to not create a TextView
+            // when the underlying data is not available for a particular movie.
+
+            // TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
+            // tv_userReviews_label.setVisibility(View.VISIBLE);
+
+            // leaving comment as I struggled a bit here and not sure if using Retrofit or Volley would have made this easier, but going to explore for sure.
+
             if (!reviewsList.isEmpty()) {
+                TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
+                tv_userReviews_label.setVisibility(View.VISIBLE);
+                rv_reviews.setVisibility(View.VISIBLE);
                 reviewsAdapter = new ReviewsAdapter(reviewsList);
                 rv_reviews.setAdapter(reviewsAdapter);
             }
+
+            // error handling and moving to use Retrofit for populating all this data to be added later , going to skip for now.
+            // going hardcode, starting with duplicating DetailActivity, going to find efficient way to load FavoriteMoviesActivity without breaking DRY principle
         }
 
     }
@@ -282,15 +299,12 @@ public class DetailActivity extends AppCompatActivity {
                 return null;
             }
 
-            URL trailersUrl = NetworkUtils.populateUrlForTrailerData(id);
+            URL trailersUrl = NetworkUtils.populateUrlForTrailerData(movieId);
 
             try {
                 String trailersJsonFromTMDB = NetworkUtils.getResponseFromHttpUrl(trailersUrl);
 
-                trailers
-                        = JsonUtils.populateTrailers(DetailActivity.this, trailersJsonFromTMDB);
-
-                return trailers;
+                return JsonUtils.populateTrailers(DetailActivity.this, trailersJsonFromTMDB);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -301,17 +315,9 @@ public class DetailActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(List<Trailer> trailerList) {
             if (trailerList != null) {
-//                 having hard time how to not have the label when there is no reviews available, moved around this piece of code to and from multiple places, need some help on how to not create a TextView
-//                 when the underlying data is not available for a particular movie.
-
-//                TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
-//                tv_userReviews_label.setVisibility(View.VISIBLE);
-
                 trailersAdapter = new TrailersAdapter(trailerList, DetailActivity.this);
                 rv_trailers.setAdapter(trailersAdapter);
             }
-
-            // error handling to be added for else condition, going to skip for now.
         }
     }
 }

@@ -11,42 +11,46 @@ import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import java.util.Objects;
+
 import static com.android.popularmovies.utils.Constants.AUTHORITY;
 
 import static com.android.popularmovies.database.FavoriteMoviesContract.Favorites.*;
 
 public class FavoriteMoviesProvider extends ContentProvider {
+    private static final String WHERE_CLAUSE = "_id=?";
     private static final int FAVORITE_MOVIES = 500;
     private static final int FAVORITE_MOVIES_ID = 501;
-
     private static final UriMatcher uriMatcher = buildUriMatcher();
 
     private FavoriteMoviesDBHelper favoriteMoviesDBHelper;
+    private SQLiteDatabase favoriteMoviesDB;
 
     private static UriMatcher buildUriMatcher() {
         UriMatcher uriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
         uriMatcher.addURI(AUTHORITY, FavoriteMoviesContract.FAV_MOVIES_PATH, FAVORITE_MOVIES);
-        uriMatcher.addURI("com.android.popularmovies", FavoriteMoviesContract.FAV_MOVIES_PATH + "/#", FAVORITE_MOVIES_ID);
+        uriMatcher.addURI(AUTHORITY, FavoriteMoviesContract.FAV_MOVIES_PATH + "/#", FAVORITE_MOVIES_ID);
         return uriMatcher;
     }
 
     @Override
     public boolean onCreate() {
         Context context = getContext();
+
         favoriteMoviesDBHelper = new FavoriteMoviesDBHelper(context);
+        favoriteMoviesDB = favoriteMoviesDBHelper.getWritableDatabase();
         return true;
     }
 
     @Nullable
     @Override
     public Cursor query(@NonNull Uri uri, @Nullable String[] projection, @Nullable String selection, @Nullable String[] selectionArgs, @Nullable String sortOrder) {
-        final SQLiteDatabase db = favoriteMoviesDBHelper.getReadableDatabase();
-        int match = uriMatcher.match(uri);
-        Cursor returnCursor;
+        int matchedCode = uriMatcher.match(uri);
+        Cursor favMoviesCursor;
 
-        switch (match) {
+        switch (matchedCode) {
             case FAVORITE_MOVIES:
-                returnCursor = db.query(TABLE_NAME,
+                favMoviesCursor = favoriteMoviesDB.query(TABLE_NAME,
                         projection,
                         selection,
                         selectionArgs,
@@ -57,12 +61,11 @@ public class FavoriteMoviesProvider extends ContentProvider {
 
             case FAVORITE_MOVIES_ID:
                 String id = uri.getPathSegments().get(1);
-                String mSelection = "_id=?";
                 String[] mSelectionArgs = new String[]{id};
 
-                returnCursor = db.query(TABLE_NAME,
+                favMoviesCursor = favoriteMoviesDB.query(TABLE_NAME,
                         projection,
-                        mSelection,
+                        WHERE_CLAUSE,
                         mSelectionArgs,
                         null,
                         null,
@@ -72,86 +75,72 @@ public class FavoriteMoviesProvider extends ContentProvider {
             default:
                 throw new UnsupportedOperationException("Cannot find location - " + uri);
         }
-        returnCursor.setNotificationUri(getContext().getContentResolver(), uri);
-        return returnCursor;
+
+        favMoviesCursor.setNotificationUri(Objects.requireNonNull(getContext()).getContentResolver(), uri);
+
+        return favMoviesCursor;
     }
 
     @Nullable
     @Override
     public String getType(@NonNull Uri uri) {
-        int match = uriMatcher.match(uri);
+        int matchedCode = uriMatcher.match(uri);
 
-        switch (match) {
-            case FAVORITE_MOVIES:
-                return "vnd.android.cursor.dir" + "/" + AUTHORITY + "/" + FavoriteMoviesContract.FAV_MOVIES_PATH;
-            case FAVORITE_MOVIES_ID:
-                return "vnd.android.cursor.item" + "/" + AUTHORITY + "/" + FavoriteMoviesContract.FAV_MOVIES_PATH;
-            default:
-                throw new UnsupportedOperationException("Cannot find location - " + uri);
+        if (matchedCode == FAVORITE_MOVIES) {
+            return "vnd.android.cursor.dir" + "/" + AUTHORITY + "/" + FavoriteMoviesContract.FAV_MOVIES_PATH;
+        } else if (matchedCode == FAVORITE_MOVIES_ID) {
+            return "vnd.android.cursor.item" + "/" + AUTHORITY + "/" + FavoriteMoviesContract.FAV_MOVIES_PATH;
         }
+        return "Error finding type";
     }
 
     @Nullable
     @Override
     public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
-        final SQLiteDatabase db = favoriteMoviesDBHelper.getWritableDatabase();
-        int match = uriMatcher.match(uri);
-        Uri returnUri; //Uri to be returned
+        int matchedCode = uriMatcher.match(uri);
+        Uri contentUriAfterInsert = null;
 
-        switch (match) {
-            case FAVORITE_MOVIES:
-                long id = db.insert(TABLE_NAME, null, values);
-                if (id > 0) {
-                    returnUri = ContentUris.withAppendedId(FavoriteMoviesContract.Favorites.CONTENT_URI, id);
-                } else {
-                    throw new android.database.SQLException("Failed to insert row into" + uri);
-                }
-                break;
-            default:
-                throw new UnsupportedOperationException("Cannot find location - " + uri);
+        if (matchedCode == FAVORITE_MOVIES) {
+            long id = favoriteMoviesDB.insert(TABLE_NAME, null, values);
+            if (id > 0) {
+                contentUriAfterInsert = ContentUris.withAppendedId(FavoriteMoviesContract.Favorites.CONTENT_URI, id);
+            } else {
+                throw new android.database.SQLException("Insertion failed at : " + uri);
+            }
         }
-        getContext().getContentResolver().notifyChange(uri, null);
-        return returnUri;
+        Objects.requireNonNull(getContext()).getContentResolver().notifyChange(uri, null);
+        return contentUriAfterInsert;
     }
 
     @Override
     public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
-        final SQLiteDatabase db = favoriteMoviesDBHelper.getWritableDatabase();
-        int match = uriMatcher.match(uri);
-        int favoritesDeleted;
+        int matchedCode = uriMatcher.match(uri);
+        int deleteFavoriteMovie = 0;
 
-        switch (match) {
-            case FAVORITE_MOVIES:
-                favoritesDeleted = db.delete(TABLE_NAME, selection, selectionArgs);
-                break;
-            default:
-                throw new UnsupportedOperationException("Cannot find location - " + uri);
+        if (matchedCode == FAVORITE_MOVIES) {
+            deleteFavoriteMovie = favoriteMoviesDB.delete(TABLE_NAME, selection, selectionArgs);
         }
 
-        if (favoritesDeleted != 0) {
-            getContext().getContentResolver().notifyChange(uri, null);
+        if (deleteFavoriteMovie != 0) {
+            Objects.requireNonNull(getContext()).getContentResolver().notifyChange(uri, null);
         }
-        return favoritesDeleted;
+        return deleteFavoriteMovie;
     }
 
     @Override
     public int update(@NonNull Uri uri, @Nullable ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
-        int favoriteUpdated;
-        int match = uriMatcher.match(uri);
+        int updatedFavoriteMovie = 0;
+        int matchedCode = uriMatcher.match(uri);
 
-        switch (match) {
-            case FAVORITE_MOVIES_ID:
-                String id = uri.getPathSegments().get(1);
-                favoriteUpdated = favoriteMoviesDBHelper.getWritableDatabase()
-                        .update(TABLE_NAME, values, "_id=?", new String[]{id});
-                break;
-            default:
-                throw new UnsupportedOperationException("Cannot find location - " + uri);
+        if (matchedCode == FAVORITE_MOVIES_ID) {
+            String id = uri.getPathSegments().get(1);
+            updatedFavoriteMovie = favoriteMoviesDBHelper.getWritableDatabase()
+                    .update(TABLE_NAME, values, WHERE_CLAUSE, new String[]{id});
         }
 
-        if (favoriteUpdated != 0) {
-            getContext().getContentResolver().notifyChange(uri, null);
+        if (updatedFavoriteMovie != 0) {
+            Objects.requireNonNull(getContext()).getContentResolver().notifyChange(uri, null);
         }
-        return favoriteUpdated;
+        return updatedFavoriteMovie;
     }
 }

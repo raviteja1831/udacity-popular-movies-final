@@ -8,10 +8,10 @@ import com.android.popularmovies.database.FavoriteMoviesContract.*;
 
 public class FavoriteMoviesDBHelper extends SQLiteOpenHelper {
 
-    public static final int DB_VERSION = 1;
-    public static final String DB_NAME = "favoriteMovies";
+    private static final int DB_VERSION = 2;
+    private static final String DB_NAME = "favoriteMovies";
 
-    public FavoriteMoviesDBHelper(Context context) {
+    FavoriteMoviesDBHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
     }
 

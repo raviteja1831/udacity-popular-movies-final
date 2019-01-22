@@ -54,7 +54,6 @@ public class ReviewsAdapter extends RecyclerView.Adapter<ReviewsAdapter.ReviewsA
     }
 
     class ReviewsAdapterViewHolder extends RecyclerView.ViewHolder {
-
         ReviewsAdapterViewHolder(@NonNull View itemView) {
             super(itemView);
             tv_review_author = itemView.findViewById(R.id.tv_review_author);

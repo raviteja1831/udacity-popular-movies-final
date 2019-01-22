@@ -19,43 +19,53 @@ import com.android.popularmovies.utils.NetworkUtils;
 
 import java.net.URL;
 import java.util.List;
+import java.util.Objects;
+
+import static com.android.popularmovies.utils.Constants.IMAGE_URL;
+import static com.android.popularmovies.utils.Constants.MOVIE_ID;
+import static com.android.popularmovies.utils.Constants.MOVIE_OVERVIEW;
+import static com.android.popularmovies.utils.Constants.MOVIE_RATING;
+import static com.android.popularmovies.utils.Constants.MOVIE_TITLE;
+import static com.android.popularmovies.utils.Constants.RELEASE_DATE;
 
 
 public class MainActivity extends AppCompatActivity implements MoviesAdapter.MoviesAdapterOnClickHandler {
 
+    private static final String POPULAR_MOVIES_TITLE = "Popular Movies";
+    private static final String POPULAR_SORT_BY_QUERY = "popular";
+    private static final String TOP_RATED_MOVIES_TITLE = "Top Rated Movies";
+    private static final String TOP_RATED_SORT_QUERY = "top_rated";
     private static final String LIFECYCLE_CALLBACKS_KEY = "callbacks";
     private static Bundle mRecyclerViewStateFromBundle;
     private final String RECYCLER_VIEW_STATE = "recyclerView_state";
+    private String sortByQuery = "popular";
     private RecyclerView recyclerView;
-
-    String sortByQuery = "popular";
-    private MoviesAdapter adapter;
+    private MoviesAdapter moviesAdapter;
     private List<Movie> movies;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if(savedInstanceState != null) {
+        if (savedInstanceState != null) {
             sortByQuery = savedInstanceState.getString(LIFECYCLE_CALLBACKS_KEY);
         }
 
         setContentView(R.layout.activity_main);
 
         recyclerView = findViewById(R.id.rv_movies);
-
         GridLayoutManager gridLayoutManager = new GridLayoutManager(this, 2);
 
         recyclerView.setLayoutManager(gridLayoutManager);
         recyclerView.setHasFixedSize(true);
-        recyclerView.setAdapter(adapter);
+        recyclerView.setAdapter(moviesAdapter);
 
+        setTitle(POPULAR_MOVIES_TITLE);
         populateMovies();
     }
 
     private void populateMovies() {
-        String initialSort = sortByQuery;
         recyclerView.setVisibility(View.VISIBLE);
-        new DownloadMoviesTask().execute(initialSort);
+        new DownloadMoviesTask().execute(sortByQuery);
     }
 
     @Override
@@ -65,12 +75,12 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
 
         Intent detailActivityIntent = new Intent(context, detailActivityClass);
         detailActivityIntent.putExtra(Intent.EXTRA_TEXT, adapterPosition);
-        detailActivityIntent.putExtra("movieId", movies.get(adapterPosition).getId());
-        detailActivityIntent.putExtra("movieTitle", movies.get(adapterPosition).getTitle());
-        detailActivityIntent.putExtra("imageUrl", movies.get(adapterPosition).getImageUrl());
-        detailActivityIntent.putExtra("movieRating", movies.get(adapterPosition).getRating());
-        detailActivityIntent.putExtra("movieOverview", movies.get(adapterPosition).getOverview());
-        detailActivityIntent.putExtra("releaseDate", movies.get(adapterPosition).getReleaseDate());
+        detailActivityIntent.putExtra(MOVIE_ID, movies.get(adapterPosition).getId());
+        detailActivityIntent.putExtra(MOVIE_TITLE, movies.get(adapterPosition).getTitle());
+        detailActivityIntent.putExtra(IMAGE_URL, movies.get(adapterPosition).getImageUrl());
+        detailActivityIntent.putExtra(MOVIE_RATING, movies.get(adapterPosition).getRating());
+        detailActivityIntent.putExtra(MOVIE_OVERVIEW, movies.get(adapterPosition).getOverview());
+        detailActivityIntent.putExtra(RELEASE_DATE, movies.get(adapterPosition).getReleaseDate());
 
         startActivity(detailActivityIntent);
 
@@ -87,20 +97,22 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
         int menuItem = item.getItemId();
 
         if (menuItem == R.id.action_popular) {
-            sortByQuery = "popular";
+            setTitle(POPULAR_MOVIES_TITLE);
+            sortByQuery = POPULAR_SORT_BY_QUERY;
             populateMovies();
             return true;
         }
 
         if (menuItem == R.id.action_topRated) {
-            sortByQuery = "top_rated";
+            setTitle(TOP_RATED_MOVIES_TITLE);
+            sortByQuery = TOP_RATED_SORT_QUERY;
             populateMovies();
             return true;
         }
 
         if (menuItem == R.id.action_FavoriteMovie) {
             Context context = this;
-            Class destinationClass = FavoritesActivity.class;
+            Class destinationClass = FavoriteActivity.class;
             Intent intent = new Intent(context, destinationClass);
             startActivity(intent);
             return true;
@@ -125,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
     @Override
     protected void onPause() {
         mRecyclerViewStateFromBundle = new Bundle();
-        Parcelable listState = recyclerView.getLayoutManager().onSaveInstanceState();
+        Parcelable listState = Objects.requireNonNull(recyclerView.getLayoutManager()).onSaveInstanceState();
         mRecyclerViewStateFromBundle.putParcelable(RECYCLER_VIEW_STATE, listState);
         super.onPause();
     }
@@ -135,7 +147,7 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
         super.onResume();
         if (mRecyclerViewStateFromBundle != null) {
             Parcelable listState = mRecyclerViewStateFromBundle.getParcelable(RECYCLER_VIEW_STATE);
-            recyclerView.getLayoutManager().onRestoreInstanceState(listState);
+            Objects.requireNonNull(recyclerView.getLayoutManager()).onRestoreInstanceState(listState);
         }
     }
 
@@ -171,8 +183,8 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Mov
         protected void onPostExecute(List<Movie> movieList) {
             if (!movieList.isEmpty()) {
                 recyclerView.setVisibility(View.VISIBLE);
-                adapter = new MoviesAdapter(movieList, MainActivity.this);
-                recyclerView.setAdapter(adapter);
+                moviesAdapter = new MoviesAdapter(movieList, MainActivity.this);
+                recyclerView.setAdapter(moviesAdapter);
             }
         }
     }

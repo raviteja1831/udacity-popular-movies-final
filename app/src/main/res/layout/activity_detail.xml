@@ -31,6 +31,7 @@
             app:layout_constraintStart_toEndOf="@+id/iv_movie_poster"
             app:layout_constraintTop_toTopOf="parent" />
 
+
         <TextView
             android:id="@+id/tv_rating_label"
             android:layout_width="wrap_content"
@@ -74,15 +75,27 @@
             app:layout_constraintStart_toStartOf="@+id/tv_release_label"
             app:layout_constraintTop_toBottomOf="@+id/tv_release_label" />
 
-        <Button
-            android:id="@+id/add_to_favorites"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/add_to_favorites"
-            android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="@+id/iv_movie_poster"
-            app:layout_constraintStart_toStartOf="@+id/tv_release_date" />
+        <com.sackcentury.shinebuttonlib.ShineButton
+            android:id="@+id/btn_favourite"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_alignParentEnd="true"
+            android:src="@android:color/darker_gray"
+            app:allow_random_color="false"
+            app:big_shine_color="#835757"
+            app:btn_color="#e7e1e1"
+            app:btn_fill_color="#e70606"
+            app:click_animation_duration="200"
+            app:enable_flashing="false"
+            app:layout_constraintStart_toStartOf="@+id/tv_release_date"
+            app:layout_constraintTop_toBottomOf="@+id/tv_release_date"
+            app:shine_animation_duration="2500"
+            app:shine_count="10"
+            app:shine_turn_angle="10"
+            app:siShape="@raw/star"
+            android:layout_marginTop="10dp"
+            app:small_shine_color="#CC9999"
+            app:small_shine_offset_angle="20" />
 
         <TextView
             android:id="@+id/tv_overview_label"
@@ -134,6 +147,7 @@
             android:text="@string/userReviews_label"
             android:textSize="22sp"
             android:textStyle="bold"
+            android:visibility="invisible"
             app:layout_constraintTop_toBottomOf="@+id/rv_trailers" />
 
         <android.support.v7.widget.RecyclerView

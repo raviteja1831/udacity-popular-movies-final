@@ -14,7 +14,7 @@
 
     <View
         android:layout_width="fill_parent"
-        android:layout_height="2dp"
-        android:background="#dbdbdb" />
+        android:layout_height="1dp"
+        android:background="#c6e4fc" />
 
 </LinearLayout>

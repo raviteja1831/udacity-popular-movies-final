@@ -3,6 +3,7 @@ package com.android.popularmovies.adapter;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,25 +15,32 @@ import com.android.popularmovies.R;
 import com.android.popularmovies.database.FavoriteMoviesContract.*;
 import com.squareup.picasso.Picasso;
 
-public class FavoritesCursorAdapter extends RecyclerView.Adapter<FavoritesCursorAdapter.FavoriteViewHolder> {
+import static com.android.popularmovies.utils.Constants.IMAGE_URL;
+import static com.android.popularmovies.utils.Constants.MOVIE_ID;
+import static com.android.popularmovies.utils.Constants.MOVIE_OVERVIEW;
+import static com.android.popularmovies.utils.Constants.MOVIE_RATING;
+import static com.android.popularmovies.utils.Constants.MOVIE_TITLE;
+import static com.android.popularmovies.utils.Constants.RELEASE_DATE;
+
+public class FavoritesCursorAdapter extends RecyclerView.Adapter<FavoritesCursorAdapter.FavoriteMoviesViewHolder> {
 
     private Cursor mCursor;
     private Context mContext;
 
-
-    public FavoritesCursorAdapter(Context mContext) {
-        this.mContext = mContext;
+    public FavoritesCursorAdapter(Context context) {
+        this.mContext = context;
     }
 
 
+    @NonNull
     @Override
-    public FavoriteViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public FavoriteMoviesViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(mContext).inflate(R.layout.movie_item, parent, false);
-        return new FavoriteViewHolder(view);
+        return new FavoriteMoviesViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(FavoriteViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull FavoriteMoviesViewHolder holder, int position) {
         int idIndex = mCursor.getColumnIndex(Favorites._ID);
         int posterIndex = mCursor.getColumnIndex(Favorites.MOVIE_IMAGE_URL);
 
@@ -44,9 +52,18 @@ public class FavoritesCursorAdapter extends RecyclerView.Adapter<FavoritesCursor
         holder.itemView.setTag(id);
         Picasso.get()
                 .load(imageUrl)
-                .into(holder.mMovieListImageView);
+                .into(holder.mMovieImageView);
+    }
 
+    public Cursor swapCursor(Cursor cursor) {
+        if (mCursor == cursor) {
+            return null;
+        }
+        Cursor tempCursor = mCursor;
+        this.mCursor = cursor;
+        this.notifyDataSetChanged();
 
+        return tempCursor;
     }
 
     @Override
@@ -57,54 +74,41 @@ public class FavoritesCursorAdapter extends RecyclerView.Adapter<FavoritesCursor
         return mCursor.getCount();
     }
 
-    public Cursor swapCursor(Cursor c) {
-        if (mCursor == c) {
-            return null;
-        }
+    class FavoriteMoviesViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+        ImageView mMovieImageView;
 
-        Cursor temp = mCursor;
-        this.mCursor = c;
-
-        if (c != null) {
-            this.notifyDataSetChanged();
-        }
-        return temp;
-    }
-
-    class FavoriteViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-        ImageView mMovieListImageView;
-
-        public FavoriteViewHolder(View itemView) {
+        FavoriteMoviesViewHolder(View itemView) {
             super(itemView);
 
-            mMovieListImageView = (ImageView) itemView.findViewById(R.id.iv_movie_posters);
-
+            mMovieImageView = itemView.findViewById(R.id.iv_movie_posters);
             itemView.setOnClickListener(this);
         }
 
         @Override
-        public void onClick(View v) {
+        public void onClick(View view) {
             int adapterPosition = getAdapterPosition();
             mCursor.moveToPosition(adapterPosition);
-            Class destinationClass = FavoriteMoviesActivity.class;
+
+            Class favoriteMoviesActivityClass = FavoriteMoviesActivity.class;
 
             int movieId = mCursor.getInt(mCursor.getColumnIndex(Favorites.MOVIE_ID));
-            String title = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_TITLE));
+            String movieTitle = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_TITLE));
             String imageUrl = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_IMAGE_URL));
-            String rating = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_RATING));
+            String movieRating = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_RATING));
             String overview = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_OVERVIEW));
             String releaseDate = mCursor.getString(mCursor.getColumnIndex(Favorites.MOVIE_RELEASE_DATE));
 
-            Intent intentToStartDetailActivity = new Intent(mContext, destinationClass);
-            intentToStartDetailActivity.putExtra(Intent.EXTRA_TEXT, adapterPosition);
-            intentToStartDetailActivity.putExtra("movieId", movieId);
-            intentToStartDetailActivity.putExtra("movieTitle", title);
-            intentToStartDetailActivity.putExtra("imageUrl", imageUrl);
-            intentToStartDetailActivity.putExtra("movieRating", rating);
-            intentToStartDetailActivity.putExtra("movieOverview", overview);
-            intentToStartDetailActivity.putExtra("releaseDate", releaseDate);
+            Intent intentToStartFavoriteMoviesActivity = new Intent(mContext, favoriteMoviesActivityClass);
 
-            mContext.startActivity(intentToStartDetailActivity);
+            intentToStartFavoriteMoviesActivity.putExtra(Intent.EXTRA_TEXT, adapterPosition);
+            intentToStartFavoriteMoviesActivity.putExtra(MOVIE_ID, movieId);
+            intentToStartFavoriteMoviesActivity.putExtra(MOVIE_TITLE, movieTitle);
+            intentToStartFavoriteMoviesActivity.putExtra(IMAGE_URL, imageUrl);
+            intentToStartFavoriteMoviesActivity.putExtra(MOVIE_RATING, movieRating);
+            intentToStartFavoriteMoviesActivity.putExtra(MOVIE_OVERVIEW, overview);
+            intentToStartFavoriteMoviesActivity.putExtra(RELEASE_DATE, releaseDate);
+
+            mContext.startActivity(intentToStartFavoriteMoviesActivity);
 
         }
     }

@@ -13,7 +13,6 @@ public class FavoriteMoviesContract {
                 BASE_URI.buildUpon().appendPath(FAV_MOVIES_PATH).build();
 
         public static final String TABLE_NAME = "favoriteMovies";
-
         public static final String MOVIE_ID = "movieId";
         public static final String MOVIE_TITLE = "movieTitle";
         public static final String MOVIE_IMAGE_URL = "imageUrl";

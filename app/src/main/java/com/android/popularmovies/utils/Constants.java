@@ -42,4 +42,11 @@ public class Constants {
 
     public final static String AUTHORITY = "com.android.popularmovies";
 
+    public final static String MOVIE_ID = "movieId";
+    public final static String MOVIE_TITLE = "movieTitle";
+    public final static String IMAGE_URL = "imageUrl";
+    public final static String MOVIE_RATING = "movieRating";
+    public final static String MOVIE_OVERVIEW = "movieOverview";
+    public final static String RELEASE_DATE = "releaseDate";
+
 }

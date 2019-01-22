@@ -13,9 +13,6 @@
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity"
             android:launchMode="singleTop">
-            <!--singleTop so when the results are changed to top rated going-->
-            <!--back doesn't flip to initial version, started with standard but -->
-            <!--that didn't help and took good amount of time for me to figure out why, changing to this helped!-->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -33,7 +30,7 @@
             android:exported="false" />
 
         <activity
-            android:name=".FavoritesActivity"
+            android:name=".FavoriteActivity"
             android:parentActivityName=".MainActivity"
             android:launchMode="singleTop">
             <meta-data
@@ -43,7 +40,7 @@
 
         <activity
             android:name=".FavoriteMoviesActivity"
-            android:parentActivityName=".FavoritesActivity">
+            android:parentActivityName=".FavoriteActivity">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value=".MainActivity" />
