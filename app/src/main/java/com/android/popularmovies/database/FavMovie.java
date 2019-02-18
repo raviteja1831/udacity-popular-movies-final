@@ -1,11 +1,12 @@
-package com.android.popularmovies.dto;
+package com.android.popularmovies.database;
 
-import java.io.Serializable;
+import android.arch.persistence.room.Entity;
+import android.arch.persistence.room.PrimaryKey;
 
-import lombok.Data;
+@Entity(tableName = "favMovies")
+public class FavMovie {
 
-@Data
-public class Movie implements Serializable {
+    @PrimaryKey
     private int id;
     private String title;
     private String imageUrl;
@@ -13,10 +14,7 @@ public class Movie implements Serializable {
     private String overview;
     private String releaseDate;
 
-    public Movie() {
-    }
-
-    public Movie(int id, String title, String imageUrl, String rating, String overview, String releaseDate) {
+    public FavMovie(int id, String title, String imageUrl, String rating, String overview, String releaseDate) {
         this.id = id;
         this.title = title;
         this.imageUrl = imageUrl;

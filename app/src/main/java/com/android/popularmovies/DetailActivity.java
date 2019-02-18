@@ -1,23 +1,22 @@
 package com.android.popularmovies;
 
-import android.content.ContentValues;
-import android.database.Cursor;
-import android.net.Uri;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.popularmovies.adapter.ReviewsAdapter;
 import com.android.popularmovies.adapter.TrailersAdapter;
-import com.android.popularmovies.database.FavoriteMoviesContract;
+import com.android.popularmovies.database.FavMovie;
+import com.android.popularmovies.database.FavMovieDatabase;
+import com.android.popularmovies.dto.Movie;
 import com.android.popularmovies.dto.Review;
 import com.android.popularmovies.dto.Trailer;
 import com.android.popularmovies.utils.AppExecutors;
@@ -33,16 +32,7 @@ import java.util.Objects;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
-import static com.android.popularmovies.utils.Constants.IMAGE_URL;
-import static com.android.popularmovies.utils.Constants.MOVIE_ID;
-import static com.android.popularmovies.utils.Constants.MOVIE_OVERVIEW;
-import static com.android.popularmovies.utils.Constants.MOVIE_RATING;
-import static com.android.popularmovies.utils.Constants.MOVIE_TITLE;
-import static com.android.popularmovies.utils.Constants.RELEASE_DATE;
-
 public class DetailActivity extends AppCompatActivity {
-    private static Bundle mBundleRecyclerViewState;
-    private final String KEY_RECYCLER_STATE = "recyclerView_state";
 
     @BindView(R.id.iv_movie_poster)
     ImageView mMoviePoster;
@@ -59,28 +49,17 @@ public class DetailActivity extends AppCompatActivity {
     @BindView(R.id.details_scrollView)
     ScrollView mScrollView;
 
-    String[] columnsToReturnProjection =
-            {
-                    FavoriteMoviesContract.Favorites._ID,
-                    FavoriteMoviesContract.Favorites.MOVIE_ID
-            };
-    Uri newContentUri;
-
-    private String movieTitle;
-    private String imageUrl;
-    private String movieRating;
-    private String movieOverview;
-    private String releaseDate;
+    private Movie movie;
     private int movieId;
-
-    private String[] selectionArgs = {""};
-    private String selectionClause;
 
     private RecyclerView rv_trailers;
     private TrailersAdapter trailersAdapter;
 
     private RecyclerView rv_reviews;
     private ReviewsAdapter reviewsAdapter;
+
+    private FavMovieDatabase database;
+    private Boolean isFavorite = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,15 +69,47 @@ public class DetailActivity extends AppCompatActivity {
 
         ButterKnife.bind(this);
 
+        Intent intent = getIntent();
+        if (intent == null) {
+            finish();
+            Toast.makeText(this, "intent is null!!", Toast.LENGTH_SHORT).show();
+        }
+
+        movie = (Movie) Objects.requireNonNull(intent).getSerializableExtra("movieItem");
+
+        if (movie == null) {
+            finish();
+            Toast.makeText(this, "no movies found.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        movieId = movie.getId();
+
+        database = FavMovieDatabase.getInstance(getApplicationContext());
+
+        AppExecutors.getInstance().diskIO().execute(new Runnable() {
+            @Override
+            public void run() {
+                final FavMovie favMovie = database.movieDao().loadMovieById(movie.getId());
+                setFavoriteMovie(favMovie != null ? true : false);
+            }
+        });
+
         populateMovieDetails();
         trailers();
         userReviews();
 
-        if (isFavoriteMovie(String.valueOf(movieId))) {
-            favoriteButton.setChecked(true);
-        }
         favoriteButtonOnStateChanged();
-        isFavoriteMovie(String.valueOf(movieId));
+    }
+
+    private void setFavoriteMovie(Boolean favorite) {
+        if (favorite) {
+            isFavorite = true;
+            favoriteButton.setChecked(true);
+        } else {
+            isFavorite = false;
+            favoriteButton.setChecked(false);
+        }
+
     }
 
     private void trailers() {
@@ -126,19 +137,24 @@ public class DetailActivity extends AppCompatActivity {
         favoriteButton.setOnCheckStateChangeListener(new ShineButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(View view, final boolean checked) {
+
+                final FavMovie favMovie = new FavMovie(movie.getId(), movie.getTitle(), movie.getImageUrl(), movie.getRating(), movie.getOverview(), movie.getReleaseDate());
+
                 AppExecutors.getInstance().diskIO().execute(new Runnable() {
                     @Override
                     public void run() {
-                        try {
                             if (checked) {
-                                addToFavorites(movieTitle, movieId, imageUrl, movieRating, releaseDate, movieOverview);
+                                database.movieDao().insert(favMovie);
                             } else {
-                                removeFromFavorites(String.valueOf(movieId));
+                                database.movieDao().delete(favMovie);
                             }
 
-                        } catch (Exception e) {
-                            Log.e(DetailActivity.class.getSimpleName(), e.getMessage());
-                        }
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                setFavoriteMovie(!isFavorite);
+                            }
+                        });
                     }
                 });
             }
@@ -154,87 +170,17 @@ public class DetailActivity extends AppCompatActivity {
     }
 
     private void populateMovieDetails() {
-        movieTitle = getIntent().getStringExtra(MOVIE_TITLE);
-        imageUrl = getIntent().getStringExtra(IMAGE_URL);
-        movieRating = getIntent().getStringExtra(MOVIE_RATING);
-        movieOverview = getIntent().getStringExtra(MOVIE_OVERVIEW);
-        releaseDate = getIntent().getStringExtra(RELEASE_DATE);
-        movieId = getIntent().getIntExtra(MOVIE_ID, 0);
+        String imageUrl = movie.getImageUrl();
+        movieId = movie.getId();
 
-        mMovieTitle.setText(movieTitle);
-        mMovieOverview.setText(movieOverview);
-        mMovieReleaseDate.setText(releaseDate);
-        mMovieRating.setText(movieRating);
+        mMovieTitle.setText(movie.getTitle());
+        mMovieOverview.setText(movie.getOverview());
+        mMovieReleaseDate.setText(movie.getReleaseDate());
+        mMovieRating.setText(movie.getRating());
 
         Picasso.get()
                 .load(imageUrl)
                 .into(mMoviePoster);
-    }
-
-    private void addToFavorites(String name, int id, String poster, String rate, String release, String overview) {
-        ContentValues contentValues = new ContentValues();
-
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_ID, id);
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_TITLE, name);
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_IMAGE_URL, poster);
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RATING, rate);
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_RELEASE_DATE, release);
-        contentValues.put(FavoriteMoviesContract.Favorites.MOVIE_OVERVIEW, overview);
-
-
-        newContentUri = getContentResolver().insert(
-                FavoriteMoviesContract.Favorites.CONTENT_URI,
-                contentValues
-        );
-    }
-
-    private void removeFromFavorites(String id) {
-        selectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " LIKE ?";
-        String[] selectionArgs = new String[]{id};
-
-        getContentResolver().delete(
-                FavoriteMoviesContract.Favorites.CONTENT_URI,
-                selectionClause,
-                selectionArgs
-        );
-    }
-
-    @Override
-    protected void onPause() {
-        mBundleRecyclerViewState = new Bundle();
-
-        Parcelable listState = Objects.requireNonNull(rv_reviews.getLayoutManager()).onSaveInstanceState();
-        mBundleRecyclerViewState.putParcelable(KEY_RECYCLER_STATE, listState);
-
-        super.onPause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (mBundleRecyclerViewState != null) {
-            Parcelable listState = mBundleRecyclerViewState.getParcelable(KEY_RECYCLER_STATE);
-            Objects.requireNonNull(rv_reviews.getLayoutManager()).onRestoreInstanceState(listState);
-        }
-    }
-
-    public boolean isFavoriteMovie(String id) {
-        selectionClause = FavoriteMoviesContract.Favorites.MOVIE_ID + " = ?";
-        selectionArgs[0] = id;
-        Cursor mCursor = getContentResolver().query(
-                FavoriteMoviesContract.Favorites.CONTENT_URI,
-                columnsToReturnProjection,
-                selectionClause,
-                selectionArgs,
-                null);
-
-        if (Objects.requireNonNull(mCursor).getCount() <= 0) {
-            mCursor.close();
-            return false;
-        }
-        mCursor.close();
-        return true;
     }
 
     public class DownloadUserReviewsTask extends AsyncTask<String, Void, List<Review>> {
@@ -265,14 +211,6 @@ public class DetailActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(List<Review> reviewsList) {
-            // having hard time how to not have the label when there is no reviews available, moved around this piece of code to multiple places, need some help on how to not create a TextView
-            // when the underlying data is not available for a particular movie.
-
-            // TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
-            // tv_userReviews_label.setVisibility(View.VISIBLE);
-
-            // leaving comment as I struggled a bit here and not sure if using Retrofit or Volley would have made this easier, but going to explore for sure.
-
             if (!reviewsList.isEmpty()) {
                 TextView tv_userReviews_label = findViewById(R.id.tv_userReviews_label);
                 tv_userReviews_label.setVisibility(View.VISIBLE);
@@ -280,9 +218,6 @@ public class DetailActivity extends AppCompatActivity {
                 reviewsAdapter = new ReviewsAdapter(reviewsList);
                 rv_reviews.setAdapter(reviewsAdapter);
             }
-
-            // error handling and moving to use Retrofit for populating all this data to be added later , going to skip for now.
-            // going hardcode, starting with duplicating DetailActivity, going to find efficient way to load FavoriteMoviesActivity without breaking DRY principle
         }
 
     }

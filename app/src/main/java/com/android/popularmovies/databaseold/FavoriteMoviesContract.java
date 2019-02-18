@@ -1,4 +1,4 @@
-package com.android.popularmovies.database;
+package com.android.popularmovies.databaseold;
 
 import android.net.Uri;
 import android.provider.BaseColumns;
