@@ -12,7 +12,7 @@ import android.widget.ImageView;
 
 import com.android.popularmovies.FavoriteMoviesActivity;
 import com.android.popularmovies.R;
-import com.android.popularmovies.database.FavoriteMoviesContract.*;
+import com.android.popularmovies.databaseold.FavoriteMoviesContract.*;
 import com.squareup.picasso.Picasso;
 
 import static com.android.popularmovies.utils.Constants.IMAGE_URL;

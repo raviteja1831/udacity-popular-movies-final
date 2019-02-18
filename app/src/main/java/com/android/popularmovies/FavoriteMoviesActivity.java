@@ -17,7 +17,7 @@ import android.widget.TextView;
 
 import com.android.popularmovies.adapter.ReviewsAdapter;
 import com.android.popularmovies.adapter.TrailersAdapter;
-import com.android.popularmovies.database.FavoriteMoviesContract;
+import com.android.popularmovies.databaseold.FavoriteMoviesContract;
 import com.android.popularmovies.dto.Review;
 import com.android.popularmovies.dto.Trailer;
 import com.android.popularmovies.utils.AppExecutors;

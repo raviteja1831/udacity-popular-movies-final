@@ -1,4 +1,4 @@
-package com.android.popularmovies.database;
+package com.android.popularmovies.databaseold;
 
 import android.content.ContentProvider;
 import android.content.ContentUris;
@@ -15,7 +15,7 @@ import java.util.Objects;
 
 import static com.android.popularmovies.utils.Constants.AUTHORITY;
 
-import static com.android.popularmovies.database.FavoriteMoviesContract.Favorites.*;
+import static com.android.popularmovies.databaseold.FavoriteMoviesContract.Favorites.*;
 
 public class FavoriteMoviesProvider extends ContentProvider {
     private static final String WHERE_CLAUSE = "_id=?";

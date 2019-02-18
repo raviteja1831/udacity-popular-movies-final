@@ -13,7 +13,7 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 
 import com.android.popularmovies.adapter.FavoritesCursorAdapter;
-import com.android.popularmovies.database.FavoriteMoviesContract;
+import com.android.popularmovies.databaseold.FavoriteMoviesContract;
 
 import java.util.Objects;
 
